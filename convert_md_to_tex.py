@@ -6,9 +6,12 @@ import re
 
 def escape_latex(text):
     """Escape special LaTeX characters"""
-    # Order matters! & must be escaped first, then other chars
+    # Use a placeholder for backslash to avoid escaping braces in \textbackslash{}
+    BACKSLASH_PLACEHOLDER = '\x00BACKSLASH\x00'
+    text = text.replace('\\', BACKSLASH_PLACEHOLDER)
+
+    # Escape other special characters
     replacements = [
-        ('\\', r'\textbackslash{}'),
         ('&', r'\&'),
         ('%', r'\%'),
         ('$', r'\$'),
@@ -21,6 +24,9 @@ def escape_latex(text):
     ]
     for old, new in replacements:
         text = text.replace(old, new)
+
+    # Now replace the placeholder with the actual LaTeX command
+    text = text.replace(BACKSLASH_PLACEHOLDER, r'\textbackslash{}')
     return text
 
 def convert_bold(text):
@@ -107,9 +113,9 @@ def convert_markdown_to_latex(md_content):
 
     i = 0
     in_list = False
-    list_depth = 0
     current_list_depths = []
     skip_toc = False
+    title_done = False  # Track if main title has been processed
 
     while i < len(lines):
         line = lines[i]
@@ -148,15 +154,21 @@ def convert_markdown_to_latex(md_content):
                 current_list_depths.pop()
             in_list = False
 
-        # Main title
+        # Main title (first # heading) or chapter (subsequent # headings)
         if stripped.startswith('# ') and not stripped.startswith('## '):
             title = stripped[2:]
             title = escape_latex(title)
-            latex_parts.append(f'\\title{{{title}}}\n')
-            latex_parts.append('\\date{\\today}\n')
-            latex_parts.append('\\maketitle\n\n')
-            latex_parts.append('\\tableofcontents\n')
-            latex_parts.append('\\newpage\n\n')
+            if not title_done:
+                # First # heading becomes the document title
+                latex_parts.append(f'\\title{{{title}}}\n')
+                latex_parts.append('\\date{\\today}\n')
+                latex_parts.append('\\maketitle\n\n')
+                latex_parts.append('\\tableofcontents\n')
+                latex_parts.append('\\newpage\n\n')
+                title_done = True
+            else:
+                # Subsequent # headings become chapters
+                latex_parts.append(f'\n\\chapter{{{title}}}\n\n')
             i += 1
             continue
 
@@ -207,6 +219,8 @@ def convert_markdown_to_latex(md_content):
                         latex_parts.append('\\end{itemize}\n')
                         current_list_depths.pop()
                     if not current_list_depths:
+                        # All lists were closed but we still have an item - start a new list
+                        latex_parts.append('\\begin{itemize}\n')
                         current_list_depths = [indent]
 
             latex_parts.append(f'  \\item {content}\n')
