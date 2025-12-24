@@ -6,9 +6,12 @@ import re
 
 def escape_latex(text):
     """Escape special LaTeX characters"""
-    # Order matters! & must be escaped first, then other chars
+    # Use a placeholder for backslash to avoid escaping braces in \textbackslash{}
+    BACKSLASH_PLACEHOLDER = '\x00BACKSLASH\x00'
+    text = text.replace('\\', BACKSLASH_PLACEHOLDER)
+
+    # Escape other special characters
     replacements = [
-        ('\\', r'\textbackslash{}'),
         ('&', r'\&'),
         ('%', r'\%'),
         ('$', r'\$'),
@@ -21,6 +24,9 @@ def escape_latex(text):
     ]
     for old, new in replacements:
         text = text.replace(old, new)
+
+    # Now replace the placeholder with the actual LaTeX command
+    text = text.replace(BACKSLASH_PLACEHOLDER, r'\textbackslash{}')
     return text
 
 def convert_bold(text):
@@ -107,7 +113,6 @@ def convert_markdown_to_latex(md_content):
 
     i = 0
     in_list = False
-    list_depth = 0
     current_list_depths = []
     skip_toc = False
 
@@ -207,6 +212,8 @@ def convert_markdown_to_latex(md_content):
                         latex_parts.append('\\end{itemize}\n')
                         current_list_depths.pop()
                     if not current_list_depths:
+                        # All lists were closed but we still have an item - start a new list
+                        latex_parts.append('\\begin{itemize}\n')
                         current_list_depths = [indent]
 
             latex_parts.append(f'  \\item {content}\n')
