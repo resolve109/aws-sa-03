@@ -115,6 +115,7 @@ def convert_markdown_to_latex(md_content):
     in_list = False
     current_list_depths = []
     skip_toc = False
+    title_done = False  # Track if main title has been processed
 
     while i < len(lines):
         line = lines[i]
@@ -153,15 +154,21 @@ def convert_markdown_to_latex(md_content):
                 current_list_depths.pop()
             in_list = False
 
-        # Main title
+        # Main title (first # heading) or chapter (subsequent # headings)
         if stripped.startswith('# ') and not stripped.startswith('## '):
             title = stripped[2:]
             title = escape_latex(title)
-            latex_parts.append(f'\\title{{{title}}}\n')
-            latex_parts.append('\\date{\\today}\n')
-            latex_parts.append('\\maketitle\n\n')
-            latex_parts.append('\\tableofcontents\n')
-            latex_parts.append('\\newpage\n\n')
+            if not title_done:
+                # First # heading becomes the document title
+                latex_parts.append(f'\\title{{{title}}}\n')
+                latex_parts.append('\\date{\\today}\n')
+                latex_parts.append('\\maketitle\n\n')
+                latex_parts.append('\\tableofcontents\n')
+                latex_parts.append('\\newpage\n\n')
+                title_done = True
+            else:
+                # Subsequent # headings become chapters
+                latex_parts.append(f'\n\\chapter{{{title}}}\n\n')
             i += 1
             continue
 
